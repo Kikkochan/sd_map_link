@@ -1,0 +1,13 @@
+----------------------------------------------------------------
+Wed Mar 29 16:03:44 CST 2023:
+Booting Derby version The Apache Software Foundation - Apache Derby - 10.12.1.1 - (1704137): instance a816c00e-0187-2c64-ee16-00001ee59f20 
+on database directory /Users/rain.chen/IdeaProjects/sd_map_link/metastore_db with class loader org.apache.spark.sql.hive.client.IsolatedClientLoader$$anon$1@507d64aa 
+Loaded from file:/Users/rain.chen/.m2/repository/org/apache/derby/derby/10.12.1.1/derby-10.12.1.1.jar
+java.vendor=Amazon.com Inc.
+java.runtime.version=1.8.0_322-b06
+user.dir=/Users/rain.chen/IdeaProjects/sd_map_link
+os.name=Mac OS X
+os.arch=x86_64
+os.version=12.1
+derby.system.home=null
+Database Class Loader started - derby.database.classpath=''
