@@ -6,14 +6,12 @@ import com.alibaba.fastjson.JSONPath;
 import com.alibaba.fastjson.parser.Feature;
 import com.nio.map.bean.MapLinkRaw;
 import com.nio.map.bean.NewResponse;
-import com.nio.map.bean.SnapshotSecond;
 import com.nio.map.util.ObjectUtil;
 import com.nio.map.util.StringUtil;
 import com.sun.org.slf4j.internal.Logger;
 import com.sun.org.slf4j.internal.LoggerFactory;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -220,15 +218,20 @@ public class DwdMapLinkJob implements Serializable {
 
                 List<String> responses = evaluateData(arrayList);
                 //异常捕获
-                String oldResponse = responses.get(0);
+                try{
+                    String oldResponse = responses.get(0);
 //                System.out.println("oldResponse:" + oldResponse);
-                String newResponse = responses.get(1);
+                    String newResponse = responses.get(1);
 //                System.out.println("newResponse:" + newResponse);
-                //生成对象
+                    //生成对象
 //                mapLinkRaw.setVehicleId(vid);
 //                mapLinkRaw.setOldResponse(oldResponse);
 //                mapLinkRaw.setNewResponse(newResponse);
 //                System.out.println(JSONObject.toJSONString(mapLinkRaw));
+
+                }catch (Exception e){
+                    LOG.error("抛出异常" + e);
+                }
 
                 Tuple2<String, List<String>> apply = Tuple2.apply(vid, responses);
                 return apply;
@@ -239,15 +242,12 @@ public class DwdMapLinkJob implements Serializable {
 //        mapRDD.collect();//必须加行动算子或转换算子才会执行该算子内的代码
 //        System.out.println(mapRDD.collect().toString());
         //2.5 打散分区
-        JavaRDD<Tuple2<String, List<String>>> resultRDD = mapRDD.coalesce(500).repartition(200);
+//        JavaRDD<Tuple2<String, List<String>>> resultRDD = mapRDD.coalesce(500).repartition(200);
 
+        //Sink
+//        mapRDD.saveAsTextFile("/Users/rain.chen/IdeaProjects/sd_map_link/out/");
 
-
-
-
-//        //Sink
-//        JavaRDD<MapLinkRaw> repRDD = resultRDD.coalesce(500).repartition(200);
-//        ss.createDataFrame(repRDD, MapLinkRaw.class).createOrReplaceTempView("sd_map_link_raw_tmp");
+//        ss.createDataFrame(resultRDD, MapLinkRaw.class).createOrReplaceTempView("sd_map_link_raw_tmp");
 //        String outputSql = "insert overwrite table ad_d_cdm.dwd_sh_map_link_raw_hi partition (pt = '${cycle-1h}')\n" +
 //                           "select vehicleId\n" +
 //                           "\t , oldResponse\n" +
@@ -301,35 +301,37 @@ public class DwdMapLinkJob implements Serializable {
 //                .replaceAll("\\s{2,}", EMPTY)
 //                .replaceAll("\\t", EMPTY)
 //                .replaceAll(StringUtils.CR, EMPTY);
-
+        ArrayList<String> listRes = new ArrayList<>();
         //异常捕获
-        oldRes = oldRes.replace("\r\n","").replace(" ","");
-        String newRes = parses(oldRes);
-        //links缺失:status=0/120/300/348/500...
-        if(newRes.equals("[{}]")||newRes.equals("[]")){
-            String status = ObjectUtil.obj2Str(JSONPath.eval(oldRes, "$.status"), "");
-            String message = ObjectUtil.obj2Str(JSONPath.eval(oldRes, "$.message"), "");
-            LOG.error("links缺失,响应状态:status=" + status + ", message=" + message);
-            LOG.error("对应body:" + body);
+        try{
+            oldRes = oldRes.replace("\r\n","").replace(" ","");
+            String newRes = parses(oldRes);
+            //links缺失:status=0/120/300/348/500...
+            if(newRes.equals("[{}]")||newRes.equals("[]")){
+                String status = ObjectUtil.obj2Str(JSONPath.eval(oldRes, "$.status"), "");
+                String message = ObjectUtil.obj2Str(JSONPath.eval(oldRes, "$.message"), "");
+                LOG.error("links缺失,响应状态:status=" + status + ", message=" + message);
+                LOG.error("对应body:" + body);
 
-            //当status=120,message=此key每秒请求量已达上限时 设置3次重试
-            if(message.equals("此key每秒请求量已达上限")){
-                for (int i = 0; i < 3; i++) {
-                    try {
-                        Thread.sleep(1000);
-                        oldRes = doPost(map_url, body);
-                        oldRes = oldRes.replace("\r\n","").replace(" ","");
-                        newRes = parses(oldRes);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
+                //当status=120,message=此key每秒请求量已达上限时 设置3次重试
+                if(message.equals("此key每秒请求量已达上限")){
+                    for (int i = 0; i < 3; i++) {
+                        try {
+                            Thread.sleep(1000);
+                            oldRes = doPost(map_url, body);
+                            oldRes = oldRes.replace("\r\n","").replace(" ","");
+                            newRes = parses(oldRes);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
                     }
                 }
             }
+            listRes.add(oldRes);
+            listRes.add(newRes);
+        }catch (Exception e){
+            LOG.error("抛出异常" + e);
         }
-
-        ArrayList<String> listRes = new ArrayList<>();
-        listRes.add(oldRes);
-        listRes.add(newRes);
         return listRes;
     }
 
